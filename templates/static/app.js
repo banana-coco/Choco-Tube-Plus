@@ -2026,20 +2026,45 @@ const mixId = params.get('id') || '';
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderSearch();
   if (!mixId) {
-    document.getElementById('mixSkeleton').innerHTML =
+    const el = document.getElementById('mixSkeleton');
+    if (el) el.innerHTML =
       `<div class="error-state"><div class="error-icon">⚠️</div><p>ミックスIDが指定されていません。</p></div>`;
     return;
   }
   loadMix();
 });
 
+function showMixError(msg) {
+  const el = document.getElementById('mixSkeleton');
+  if (el) {
+    el.hidden = false;
+    el.innerHTML = `<div class="error-state"><div class="error-icon">⚠️</div><p>${msg}</p></div>`;
+  }
+}
+
 async function loadMix() {
+  let data = null;
+
+  // まず /api/mixes/ を試みる
   try {
-    const data = await fetchMain(`/api/mixes/${encodeURIComponent(mixId)}`);
+    data = await fetchMain(`/api/mixes/${encodeURIComponent(mixId)}`);
+  } catch (_) { /* 失敗時はフォールバックへ */ }
+
+  // mixes が空 or 失敗なら /api/playlists/ にフォールバック
+  if (!data || !data.videos || data.videos.length === 0) {
+    try {
+      data = await fetchMain(`/api/playlists/${encodeURIComponent(mixId)}`);
+    } catch (e) {
+      showMixError('ミックスの取得に失敗しました。');
+      console.error(e);
+      return;
+    }
+  }
+
+  try {
     renderMix(data);
   } catch (e) {
-    document.getElementById('mixSkeleton').innerHTML =
-      `<div class="error-state"><div class="error-icon">⚠️</div><p>ミックスの取得に失敗しました。</p></div>`;
+    showMixError('ミックスの表示に失敗しました。');
     console.error(e);
   }
 }
