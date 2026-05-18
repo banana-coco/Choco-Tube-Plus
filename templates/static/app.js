@@ -4020,8 +4020,8 @@ async function reloadAll(videoId) {
       withRetry(() => fetchMain(`/api/videos/${videoId}`))
     ]);
 
-    const { data: streamData } = streamResult;
-    const invInstance = streamData._invidious_instance || null;
+    const { data: streamData, instanceUrl } = streamResult;
+    const invInstance = instanceUrl || streamData._invidious_instance || null;
     streamExcludeList = invInstance ? [invInstance] : [];
     cachedInvInstance = invInstance;
     streamAltBarReady = true;
@@ -4029,6 +4029,7 @@ async function reloadAll(videoId) {
       document.getElementById('streamAltBtn').removeAttribute('hidden');
       setInstanceLabel(invInstance);
     }
+    setHQInstanceLabel(invInstance);
 
     setupPlayer(streamData, videoId);
     renderVideoInfo(metaData, videoId);
@@ -4043,10 +4044,21 @@ async function reloadAll(videoId) {
   if (reloadAllBtn) reloadAllBtn.disabled = false;
 }
 
+function instanceHostname(invInstance) {
+  if (!invInstance) return '';
+  try { return new URL(invInstance).hostname; } catch { return invInstance; }
+}
+
 function setInstanceLabel(invInstance) {
   const label = document.getElementById('streamInstanceLabel');
   if (!label) return;
-  label.textContent = invInstance || '';
+  label.textContent = instanceHostname(invInstance);
+}
+
+function setHQInstanceLabel(invInstance) {
+  const label = document.getElementById('hqInstanceLabel');
+  if (!label) return;
+  label.textContent = instanceHostname(invInstance);
 }
 
 async function doStreamAlt(videoId) {
@@ -4063,7 +4075,7 @@ async function doStreamAlt(videoId) {
       : '';
     const { data: newStreamData, instanceUrl: newInstance } = await fetchStream(`/api/stream/${videoId}${excludeParam}`);
 
-    const newInvInstance = newStreamData._invidious_instance || null;
+    const newInvInstance = newInstance || newStreamData._invidious_instance || null;
     if (newInvInstance && !streamExcludeList.includes(newInvInstance)) {
       streamExcludeList.push(newInvInstance);
     }
@@ -4585,9 +4597,9 @@ async function initWatch(videoId) {
       withRetry(() => fetchMain(`/api/videos/${videoId}`))
     ]);
 
-    const { data: streamData } = streamResult;
+    const { data: streamData, instanceUrl } = streamResult;
 
-    const invInstance = streamData._invidious_instance || null;
+    const invInstance = instanceUrl || streamData._invidious_instance || null;
     streamExcludeList = invInstance ? [invInstance] : [];
     cachedInvInstance = invInstance;
     streamAltBarReady = true;
@@ -4599,6 +4611,7 @@ async function initWatch(videoId) {
       document.getElementById('streamAltBtn').removeAttribute('hidden');
       setInstanceLabel(invInstance);
     }
+    setHQInstanceLabel(invInstance);
 
     setupPlayer(streamData, videoId);
     renderVideoInfo(metaData, videoId);
