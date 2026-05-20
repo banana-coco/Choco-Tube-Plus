@@ -231,8 +231,65 @@ async def api_instances():
 
 # ── HTML page routes ──────────────────────────────────────────────────────────
 
+@app.get("/whats")
+async def whats():
+    return {"name": "inv-tube"}
+
+
+@app.get("/version")
+async def version():
+    return {"ver": "1.00"}
+
+
+LINKLIST_URL = "https://raw.githubusercontent.com/kuru-bana/Link-list/refs/heads/main/inv-tube.json"
+
+
+async def _check_one(url: str) -> dict:
+    base = url.rstrip("/")
+    try:
+        r = await http_client.get(f"{base}/version", timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            return {"url": base, "ver": data.get("ver", "?"), "online": True}
+        return {"url": base, "ver": None, "online": False}
+    except Exception:
+        return {"url": base, "ver": None, "online": False}
+
+
+@app.get("/api/linklist-status")
+async def linklist_status():
+    try:
+        r = await http_client.get(LINKLIST_URL, timeout=10)
+        r.raise_for_status()
+        urls = r.json()
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
+
+    results = await asyncio.gather(*[_check_one(u) for u in urls])
+    return list(results)
+
+
+@app.get("/links")
+async def links_page(request: Request):
+    return templates.TemplateResponse(request, "links.html")
+
+
+async def _ping_keepalive(self_url: str):
+    targets = [
+        f"https://link-up-r6fn.onrender.com/url={self_url}",
+        f"https://link-up-hsda.onrender.com/url={self_url}",
+    ]
+    for t in targets:
+        try:
+            await http_client.get(t, timeout=10)
+        except Exception:
+            pass
+
+
 @app.get("/")
 async def index_page(request: Request):
+    self_url = str(request.base_url).rstrip("/")
+    asyncio.create_task(_ping_keepalive(self_url))
     return templates.TemplateResponse(request, "index.html")
 
 @app.get("/dl")
@@ -242,6 +299,10 @@ async def dl_page(request: Request):
 @app.get("/watch")
 async def watch_page(request: Request):
     return templates.TemplateResponse(request, "watch.html")
+
+@app.get("/shorts/{video_id}")
+async def shorts_page(request: Request, video_id: str):
+    return templates.TemplateResponse(request, "shorts.html")
 
 @app.get("/search")
 async def search_page(request: Request):
