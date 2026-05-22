@@ -225,10 +225,9 @@ async function fetchChannelAvatar(channelId) {
   try {
     const data = await fetchMain(`/api/channels/${encodeURIComponent(channelId)}`);
     const thumbs = data.authorThumbnails || null;
-    channelAvatarCache.set(channelId, thumbs);
+    if (thumbs) channelAvatarCache.set(channelId, thumbs);
     return thumbs;
   } catch {
-    channelAvatarCache.set(channelId, null);
     return null;
   }
 }
@@ -238,10 +237,9 @@ async function fetchPlaylistAuthorThumbs(playlistId) {
   try {
     const data = await fetchMain(`/api/playlists/${encodeURIComponent(playlistId)}`);
     const result = { thumbs: data.authorThumbnails || null, authorId: data.authorId || null };
-    playlistAuthorCache.set(playlistId, result);
+    if (result.thumbs || result.authorId) playlistAuthorCache.set(playlistId, result);
     return result;
   } catch {
-    playlistAuthorCache.set(playlistId, null);
     return null;
   }
 }
