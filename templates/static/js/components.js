@@ -222,7 +222,6 @@ async function fetchChannelAvatar(channelId) {
     channelAvatarCache.set(channelId, thumbs);
     return thumbs;
   } catch {
-    channelAvatarCache.set(channelId, null);
     return null;
   }
 }
@@ -235,7 +234,6 @@ async function fetchPlaylistAuthorThumbs(playlistId) {
     playlistAuthorCache.set(playlistId, result);
     return result;
   } catch {
-    playlistAuthorCache.set(playlistId, null);
     return null;
   }
 }
