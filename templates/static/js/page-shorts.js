@@ -43,8 +43,10 @@
 
   async function fetchEduParams() {
     try {
-      const results = await Promise.all(EDU_KEYS.map(k => fetch(k.url).then(r => r.json())));
-      eduParams = results.map((json, i) => ({ label: EDU_KEYS[i].label, value: json.value || '' }));
+      const res = await fetch('/api/edu-params');
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      eduParams = data;
       const sel = document.getElementById('sfParamSelect');
       if (sel) {
         sel.innerHTML = '';
@@ -71,6 +73,23 @@
     const ytBtn = document.getElementById('sfYtBtn');
     if (watchBtn) watchBtn.href = `/watch?v=${videoId}`;
     if (ytBtn) ytBtn.href = `https://www.youtube.com/shorts/${videoId}`;
+    const shareBtn = document.getElementById('sfShareBtn');
+    const sharePanel = document.getElementById('sfSharePanel');
+    if (shareBtn && sharePanel) {
+      shareBtn.dataset.sfCurrentVideoId = videoId;
+      if (!shareBtn.dataset.shareInit) {
+        shareBtn.dataset.shareInit = '1';
+        setupSharePanel(shareBtn, sharePanel, () => {
+          const vid = shareBtn.dataset.sfCurrentVideoId || videoId;
+          return {
+            videoId: vid,
+            ytUrl: `https://www.youtube.com/shorts/${vid}`,
+            appUrl: `${location.origin}/shorts/${vid}`,
+            title: document.title,
+          };
+        });
+      }
+    }
   }
 
   function renderOverlay(data, videoId) {
