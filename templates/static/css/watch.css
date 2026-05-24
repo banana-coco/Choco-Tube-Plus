@@ -1920,6 +1920,27 @@ body.page-watch .watch-pl-new-btn {
 body.page-watch .watch-pl-new-btn:hover { background: var(--surface2); }
 
 /* ===== DOWNLOAD BUTTON ===== */
+body.page-watch .watch-share-btn[hidden] { display: none; }
+
+body.page-watch .watch-share-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+body.page-watch .watch-share-btn:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
 body.page-watch .watch-dl-btn {
   display: flex;
   align-items: center;
