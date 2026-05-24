@@ -2692,6 +2692,26 @@ async function initWatch(videoId) {
   initComments(videoId);
   if (listParam) initPlaylistPanel(listParam, indexParam);
 
+  let _homeVideoQueue = null;
+  let _homeVideoQueueIdx = -1;
+  if (!listParam) {
+    try {
+      const raw = sessionStorage.getItem('chHomeVideoQueue');
+      if (raw) {
+        const ids = JSON.parse(raw);
+        if (Array.isArray(ids) && ids.length > 1) {
+          const idx = ids.indexOf(videoId);
+          if (idx >= 0) {
+            _homeVideoQueue = ids;
+            _homeVideoQueueIdx = idx;
+          } else {
+            sessionStorage.removeItem('chHomeVideoQueue');
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   document.getElementById('reloadAllBtn').addEventListener('click', () => reloadAll(videoId));
 
   try {
@@ -2722,14 +2742,17 @@ async function initWatch(videoId) {
     renderRelated(_related);
 
     // Autoplay next (settings) — skip if in playlist/mix context
-    if (!listParam && _related.length > 0) {
-      const nextId = _related[0].videoId;
+    if (!listParam) {
       const _player = document.getElementById('videoPlayer');
       _player.addEventListener('ended', () => {
-        // Re-read settings at ended time so in-page changes are respected
         const _currentSettings = getSettings();
-        if (!_player.loop && _currentSettings.autoplayNext) {
-          window.location.href = `/watch?v=${nextId}`;
+        if (_player.loop) return;
+        if (!_currentSettings.autoplayNext) return;
+        if (_homeVideoQueue && _homeVideoQueueIdx >= 0 && _homeVideoQueueIdx < _homeVideoQueue.length - 1) {
+          window.location.href = `/watch?v=${encodeURIComponent(_homeVideoQueue[_homeVideoQueueIdx + 1])}`;
+        } else if (_related.length > 0) {
+          sessionStorage.removeItem('chHomeVideoQueue');
+          window.location.href = `/watch?v=${_related[0].videoId}`;
         }
       });
     }
