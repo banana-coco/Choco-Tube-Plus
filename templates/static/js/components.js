@@ -404,6 +404,71 @@ async function fetchStream(apiPath) {
   throw lastErr;
 }
 
+function copyText(text) {
+  return navigator.clipboard.writeText(text).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  });
+}
+
+function setupSharePanel(btnEl, panelEl, getInfo) {
+  if (!btnEl || !panelEl) return;
+  const nativeItem = panelEl.querySelector('[data-action="native"]');
+  if (nativeItem && !navigator.share) nativeItem.hidden = true;
+
+  btnEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = !panelEl.hidden;
+    document.querySelectorAll('.share-panel').forEach(p => { p.hidden = true; });
+    if (isOpen) return;
+    const info = getInfo();
+
+    panelEl.querySelector('[data-action="copy-id"]').onclick = () => {
+      copyText(info.videoId);
+      showCopyToast('動画IDをコピーしました');
+      panelEl.hidden = true;
+    };
+    panelEl.querySelector('[data-action="copy-yt"]').onclick = () => {
+      copyText(info.ytUrl);
+      showCopyToast('YouTube URLをコピーしました');
+      panelEl.hidden = true;
+    };
+    panelEl.querySelector('[data-action="copy-app"]').onclick = () => {
+      copyText(info.appUrl);
+      showCopyToast('URLをコピーしました');
+      panelEl.hidden = true;
+    };
+    if (nativeItem && navigator.share) {
+      nativeItem.onclick = () => {
+        navigator.share({ title: info.title || '', url: info.appUrl }).catch(() => {});
+        panelEl.hidden = true;
+      };
+    }
+    panelEl.hidden = false;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!btnEl.contains(e.target) && !panelEl.contains(e.target)) {
+      panelEl.hidden = true;
+    }
+  });
+}
+
+function showCopyToast(msg = 'URLをコピーしました') {
+  let toast = document.getElementById('_copyToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = '_copyToast';
+    toast.className = 'copy-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('copy-toast-show');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove('copy-toast-show'), 2000);
+}
+
 function buildSearchUrl(params) {
   const url = new URL('/search', location.origin);
   Object.entries(params).forEach(([k, v]) => {
