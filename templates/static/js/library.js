@@ -231,13 +231,57 @@ function removeFavoriteMix(mixId) {
 const LIB_SETTINGS_KEY = 'chocotube_settings';
 
 function getSettings() {
-  const defaults = { defaultSpeed: 1, loop: false, autoplayNext: false, defaultVolume: 100 };
+  const defaults = { defaultSpeed: 1, loop: false, autoplayNext: true, defaultVolume: 100, autoplay: true, savePosition: true };
   try { return { ...defaults, ...JSON.parse(localStorage.getItem(LIB_SETTINGS_KEY) || '{}') }; }
   catch { return defaults; }
 }
 
 function saveSettings(s) {
   localStorage.setItem(LIB_SETTINGS_KEY, JSON.stringify(s));
+}
+
+/* ===== PLAYBACK POSITION ===== */
+
+const LIB_POSITIONS_KEY = 'chocotube_positions';
+const POSITIONS_TTL = 30 * 24 * 60 * 60 * 1000;
+
+function getSavedPosition(videoId) {
+  try {
+    const raw = localStorage.getItem(LIB_POSITIONS_KEY);
+    if (!raw) return 0;
+    const positions = JSON.parse(raw);
+    const entry = positions[videoId];
+    if (!entry) return 0;
+    if (Date.now() - entry.ts > POSITIONS_TTL) return 0;
+    return entry.t || 0;
+  } catch { return 0; }
+}
+
+function savePosition(videoId, time) {
+  try {
+    const raw = localStorage.getItem(LIB_POSITIONS_KEY);
+    const positions = raw ? JSON.parse(raw) : {};
+    const now = Date.now();
+    Object.keys(positions).forEach(k => {
+      if (now - (positions[k].ts || 0) > POSITIONS_TTL) delete positions[k];
+    });
+    if (time > 5) {
+      positions[videoId] = { t: Math.floor(time), ts: now };
+    } else {
+      delete positions[videoId];
+    }
+    localStorage.setItem(LIB_POSITIONS_KEY, JSON.stringify(positions));
+  } catch {}
+}
+
+function clearSavedPosition(videoId) {
+  try {
+    const raw = localStorage.getItem(LIB_POSITIONS_KEY);
+    if (!raw) return;
+    const positions = JSON.parse(raw);
+    delete positions[videoId];
+    localStorage.setItem(LIB_POSITIONS_KEY, JSON.stringify(positions));
+  } catch {}
 }
 
 /* ===== PLAYLISTS ===== */
