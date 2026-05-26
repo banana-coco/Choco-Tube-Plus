@@ -401,6 +401,53 @@ header {
   padding-top: 1rem;
 }
 
+/* ===== HOME TABS ===== */
+.home-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.home-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.18s, border-color 0.18s, background 0.18s;
+}
+
+.home-tab svg {
+  flex-shrink: 0;
+  transition: color 0.18s;
+}
+
+.home-tab:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.home-tab.active {
+  color: var(--accent-bright);
+  border-bottom-color: var(--accent-bright);
+  background: transparent;
+}
+
+.home-tab.active svg {
+  color: var(--accent-bright);
+}
+
 .home-section-title {
   display: flex;
   align-items: center;
