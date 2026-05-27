@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTabs();
   renderSubs();
   renderHistory();
+  renderShortsHistory();
   renderPlaylistList();
   renderFavorites();
   initImportExport();
@@ -20,6 +21,7 @@ function renderTabs() {
       btn.classList.add('active');
       document.getElementById('subsPanel').hidden = tab !== 'subs';
       document.getElementById('histPanel').hidden = tab !== 'history';
+      document.getElementById('shortsHistPanel').hidden = tab !== 'shorts-history';
       document.getElementById('plPanel').hidden = tab !== 'playlists';
       document.getElementById('favPanel').hidden = tab !== 'favorites';
     });
@@ -122,6 +124,62 @@ function renderHistory() {
     if (confirm('視聴履歴をすべて削除しますか？')) {
       clearHistory();
       renderHistory();
+    }
+  };
+}
+
+/* ===== SHORTS HISTORY ===== */
+function renderShortsHistory() {
+  const hist = getShortsHistory();
+  const grid = document.getElementById('shortsHistGrid');
+  const empty = document.getElementById('shortsHistEmpty');
+  const count = document.getElementById('shortsHistCount');
+  const toolbar = document.getElementById('shortsHistToolbar');
+  const clearBtn = document.getElementById('clearShortsHistBtn');
+
+  count.textContent = hist.length > 0 ? hist.length : '';
+
+  if (!hist.length) {
+    empty.hidden = false;
+    toolbar.hidden = true;
+    grid.innerHTML = '';
+    return;
+  }
+  empty.hidden = true;
+  toolbar.hidden = false;
+  grid.innerHTML = '';
+
+  hist.forEach(v => {
+    const thumb = (v.videoThumbnails || []).find(t => t.quality === 'medium' || t.quality === 'default') || (v.videoThumbnails || [])[0];
+    const thumbUrl = thumb ? wsrv(thumb.url, 320) : '';
+    const authorThumb = (v.authorThumbnails || []).find(t => (t.width || 0) >= 36) || (v.authorThumbnails || [])[0];
+    const authorThumbUrl = authorThumb ? wsrv(authorThumb.url, 36) : '';
+
+    const card = document.createElement('div');
+    card.className = 'lib-shorts-hist-card';
+    card.innerHTML = `
+      <a class="lib-shorts-hist-link" href="/shorts/${encodeURIComponent(v.videoId)}">
+        <div class="lib-shorts-hist-thumb">
+          ${thumbUrl ? `<img src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" />` : '<div class="lib-shorts-hist-thumb-ph"></div>'}
+          <span class="lib-shorts-badge">Shorts</span>
+        </div>
+        <div class="lib-shorts-hist-info">
+          <div class="lib-shorts-hist-title">${escapeHtml(v.title || '')}</div>
+          <div class="lib-shorts-hist-meta">
+            ${authorThumbUrl ? `<img class="lib-shorts-hist-avatar" src="${escapeHtml(authorThumbUrl)}" alt="" loading="lazy" />` : ''}
+            <span>${escapeHtml(v.author || '')}</span>
+          </div>
+          <div class="lib-shorts-hist-date">${formatLibDate(v.watchedAt)}</div>
+        </div>
+      </a>
+    `;
+    grid.appendChild(card);
+  });
+
+  clearBtn.onclick = () => {
+    if (confirm('ショートの視聴履歴をすべて削除しますか？')) {
+      clearShortsHistory();
+      renderShortsHistory();
     }
   };
 }
@@ -303,6 +361,7 @@ function initImportExport() {
       msg.className = 'lib-import-msg lib-import-ok';
       renderSubs();
       renderHistory();
+      renderShortsHistory();
       renderPlaylistList();
       renderFavorites();
     } catch {
