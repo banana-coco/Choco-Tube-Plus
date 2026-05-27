@@ -1,0 +1,548 @@
+function initModeBar(videoId) {
+  const player = document.getElementById('videoPlayer');
+  const nocookiePlayer = document.getElementById('nocookiePlayer');
+  const errorEl = document.getElementById('playerError');
+  const errorMsg = document.getElementById('playerErrorMsg');
+  const reloadBtn = document.getElementById('reloadBtn');
+  const modeStream = document.getElementById('modeStream');
+  const modeNocookie = document.getElementById('modeNocookie');
+  const modeHQ = document.getElementById('modeHQ');
+
+  reloadBtn.addEventListener('click', () => {
+    errorEl.hidden = true;
+    reloadBtn.hidden = true;
+    player.removeAttribute('hidden');
+    player.load();
+    player.play().catch(() => {});
+  });
+
+  function setOverlayQualMode(mode) {
+    const qw = document.getElementById('vcQualWrap');
+    const vw = document.getElementById('vcHQVidWrap');
+    const aw = document.getElementById('vcHQAudWrap');
+    if (mode === 'stream') {
+      if (qw) qw.removeAttribute('hidden');
+      if (vw) vw.setAttribute('hidden', '');
+      if (aw) aw.setAttribute('hidden', '');
+    } else if (mode === 'hq') {
+      if (qw) qw.setAttribute('hidden', '');
+      if (vw) vw.removeAttribute('hidden');
+      if (aw) aw.removeAttribute('hidden');
+    } else {
+      if (qw) qw.setAttribute('hidden', '');
+      if (vw) vw.setAttribute('hidden', '');
+      if (aw) aw.setAttribute('hidden', '');
+    }
+  }
+
+  modeStream.addEventListener('click', () => {
+    if (modeStream.classList.contains('active')) return;
+    const ct = getEstimatedCurrentTime();
+    stopIframeTracking();
+    if (hqActive) teardownHQ();
+    modeStream.classList.add('active');
+    modeNocookie.classList.remove('active');
+    modeHQ.classList.remove('active');
+    const _mEdu = document.getElementById('modeEdu');
+    if (_mEdu) _mEdu.classList.remove('active');
+    const _ep = document.getElementById('eduPlayer');
+    if (_ep) { _ep.setAttribute('hidden', ''); _ep.src = 'about:blank'; }
+    const _eb = document.getElementById('eduBar');
+    if (_eb) _eb.setAttribute('hidden', '');
+    nocookiePlayer.setAttribute('hidden', '');
+    nocookiePlayer.src = 'about:blank';
+    errorEl.hidden = true;
+    reloadBtn.hidden = true;
+    document.getElementById('qualityBar').removeAttribute('hidden');
+    document.getElementById('vctrls').classList.add('vctrls-show');
+    setOverlayQualMode('stream');
+    if (streamAltBarReady) {
+      document.getElementById('streamAltBtn').removeAttribute('hidden');
+      setInstanceLabel(cachedInvInstance);
+    }
+    if (lastStreamSrc) {
+      player.src = lastStreamSrc;
+      player.removeAttribute('hidden');
+      if (ct > 1) {
+        player.addEventListener('loadedmetadata', () => {
+          player.currentTime = ct;
+          player.play().catch(() => {});
+        }, { once: true });
+      } else {
+        player.play().catch(() => {});
+      }
+    } else if (player.src) {
+      player.removeAttribute('hidden');
+      player.play().catch(() => {});
+    } else {
+      errorEl.hidden = false;
+      errorMsg.textContent = 'このAPIではストリームURLが取得できませんでした。YouTubeで視聴してください。';
+    }
+  });
+
+  modeHQ.addEventListener('click', () => {
+    if (modeHQ.classList.contains('active')) return;
+    const ct = getEstimatedCurrentTime();
+    stopIframeTracking();
+    lastStreamSrc = (streamOnlyMode === 'audio' && lastNormalStreamSrc) ? lastNormalStreamSrc : player.src;
+    if (streamOnlyMode !== 'normal') {
+      streamOnlyMode = 'normal';
+      const _pw = document.getElementById('playerWrap');
+      if (_pw) _pw.classList.remove('stream-audio-only');
+      const _atb = document.getElementById('audioTrackBar');
+      if (_atb) _atb.setAttribute('hidden', '');
+      const _vtb = document.getElementById('videoTrackBar');
+      if (_vtb) _vtb.setAttribute('hidden', '');
+    }
+    modeHQ.classList.add('active');
+    modeStream.classList.remove('active');
+    modeNocookie.classList.remove('active');
+    const _mEdu2 = document.getElementById('modeEdu');
+    if (_mEdu2) _mEdu2.classList.remove('active');
+    const _ep2 = document.getElementById('eduPlayer');
+    if (_ep2) { _ep2.setAttribute('hidden', ''); _ep2.src = 'about:blank'; }
+    const _eb2 = document.getElementById('eduBar');
+    if (_eb2) _eb2.setAttribute('hidden', '');
+    nocookiePlayer.setAttribute('hidden', '');
+    nocookiePlayer.src = 'about:blank';
+    errorEl.hidden = true;
+    reloadBtn.hidden = true;
+    document.getElementById('streamAltBtn').setAttribute('hidden', '');
+    document.getElementById('qualityBar').setAttribute('hidden', '');
+    document.getElementById('hqBar').removeAttribute('hidden');
+    document.getElementById('vctrls').classList.add('vctrls-show');
+    setOverlayQualMode('hq');
+    hqActive = true;
+    player.removeAttribute('hidden');
+    applyHQStream(ct, true);
+  });
+
+  modeNocookie.addEventListener('click', () => {
+    if (modeNocookie.classList.contains('active')) return;
+    const ct = getEstimatedCurrentTime();
+    stopIframeTracking();
+    if (hqActive) teardownHQ();
+    modeNocookie.classList.add('active');
+    modeStream.classList.remove('active');
+    modeHQ.classList.remove('active');
+    const _mEdu3 = document.getElementById('modeEdu');
+    if (_mEdu3) _mEdu3.classList.remove('active');
+    const _ep3 = document.getElementById('eduPlayer');
+    if (_ep3) { _ep3.setAttribute('hidden', ''); _ep3.src = 'about:blank'; }
+    const _eb3 = document.getElementById('eduBar');
+    if (_eb3) _eb3.setAttribute('hidden', '');
+    player.pause();
+    player.setAttribute('hidden', '');
+    document.getElementById('playerSkeleton').hidden = true;
+    errorEl.hidden = true;
+    reloadBtn.hidden = true;
+    document.getElementById('streamAltBtn').setAttribute('hidden', '');
+    document.getElementById('qualityBar').setAttribute('hidden', '');
+    document.getElementById('vctrls').classList.remove('vctrls-show');
+    setOverlayQualMode('none');
+    const _ncStart = ct > 1 ? `&start=${Math.floor(ct)}` : '';
+    const _ncPlay  = ct > 1 || getSettings().autoplay ? 1 : 0;
+    const _ncStartSec = ct > 1 ? ct : 0;
+    const _ncLoop = (!listParam && getSettings().loop) ? `&loop=1&playlist=${videoId}` : '';
+    nocookiePlayer.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=${_ncPlay}${_ncStart}&enablejsapi=1${_ncLoop}`;
+    nocookiePlayer.removeAttribute('hidden');
+    startIframeTracking(nocookiePlayer, _ncStartSec);
+  });
+
+  // ── Edu mode ──
+  const modeEdu     = document.getElementById('modeEdu');
+  const eduPlayer   = document.getElementById('eduPlayer');
+  const eduBar      = document.getElementById('eduBar');
+  const eduSelect   = document.getElementById('eduParamSelect');
+  const eduStatus   = document.getElementById('eduStatus');
+
+  let eduParams = [];
+
+  async function fetchEduParams() {
+    try {
+      const res = await fetch('/api/edu-params');
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error('invalid');
+      eduParams = data;
+      if (eduSelect) {
+        eduSelect.innerHTML = '';
+        eduParams.forEach((p, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = p.label;
+          eduSelect.appendChild(opt);
+        });
+        eduSelect.selectedIndex = 0;
+      }
+    } catch (e) {
+      if (eduStatus) { eduStatus.textContent = 'パラメータ取得失敗'; eduStatus.className = 'pc-alt-status stream-alt-fail'; }
+    }
+  }
+
+  fetchEduParams();
+
+  function getEduSrc(startSec = 0) {
+    const idx = eduSelect ? parseInt(eduSelect.value, 10) : 0;
+    let param = (eduParams[idx] && eduParams[idx].value) ? eduParams[idx].value : '?autoplay=1';
+
+    // postMessage が機能するように競合・干渉するパラメータを除去する
+    // origin= はドメインをロックして postMessage をブロックするため必ず除去
+    param = param
+      .replace(/([?&])enablejsapi=[^&]*/g, '')
+      .replace(/([?&])origin=[^&]*/g, '')
+      .replace(/([?&])autoplay=[^&]*/g, '')
+      .replace(/([?&])loop=[^&]*/g, '')
+      .replace(/([?&])playlist=[^&]*/g, '')
+      .replace(/([?&])start=[^&]*/g, '')
+      .replace(/\?&/g, '?')
+      .replace(/&&+/g, '&')
+      .replace(/[?&]$/, '');
+
+    // ?が消えて &パラメータだけ残った場合、先頭の & を ? に変換
+    if (!param.includes('?') && param.includes('&')) {
+      param = param.replace('&', '?');
+    }
+
+    const shouldPlay = startSec > 0 || getSettings().autoplay;
+    const autoplayVal = shouldPlay ? '1' : '0';
+    const sep = param.includes('?') ? '&' : '?';
+    const muteParam = params.get('muted') === '1' ? '&mute=1' : '';
+    const startParam = startSec > 0 ? `&start=${Math.floor(startSec)}` : '';
+    const loopParam = (!listParam && getSettings().loop) ? `&loop=1&playlist=${videoId}` : '';
+
+    return `https://www.youtubeeducation.com/embed/${videoId}${param}${sep}autoplay=${autoplayVal}&enablejsapi=1${muteParam}${startParam}${loopParam}`;
+  }
+
+  function activateEdu() {
+    const ct = getEstimatedCurrentTime();
+    stopIframeTracking();
+    if (hqActive) teardownHQ();
+    modeEdu.classList.add('active');
+    modeStream.classList.remove('active');
+    modeHQ.classList.remove('active');
+    modeNocookie.classList.remove('active');
+    player.pause();
+    player.setAttribute('hidden', '');
+    document.getElementById('playerSkeleton').hidden = true;
+    nocookiePlayer.setAttribute('hidden', '');
+    nocookiePlayer.src = 'about:blank';
+    errorEl.hidden = true;
+    reloadBtn.hidden = true;
+    document.getElementById('streamAltBtn').setAttribute('hidden', '');
+    document.getElementById('qualityBar').setAttribute('hidden', '');
+    document.getElementById('hqBar').setAttribute('hidden', '');
+    if (eduBar) eduBar.removeAttribute('hidden');
+    document.getElementById('vctrls').classList.remove('vctrls-show');
+    setOverlayQualMode('none');
+    if (eduPlayer) {
+      const eduStartSec = ct > 1 ? ct : 0;
+      eduPlayer.src = getEduSrc(eduStartSec);
+      eduPlayer.removeAttribute('hidden');
+      startIframeTracking(eduPlayer, eduStartSec);
+    }
+  }
+
+  if (modeEdu) modeEdu.addEventListener('click', () => {
+    if (modeEdu.classList.contains('active')) return;
+    activateEdu();
+  });
+
+  if (eduSelect) eduSelect.addEventListener('change', () => {
+    if (modeEdu && modeEdu.classList.contains('active') && eduPlayer) {
+      const ct = getEstimatedCurrentTime();
+      stopIframeTracking();
+      const eduStartSec = ct > 1 ? ct : 0;
+      eduPlayer.src = getEduSrc(eduStartSec);
+      startIframeTracking(eduPlayer, eduStartSec);
+    }
+  });
+
+  const modeParam = params.get('mode');
+  if (modeParam === 'nocookie') {
+    setTimeout(() => modeNocookie.click(), 0);
+  } else if (modeParam === 'edu' && modeEdu) {
+    setTimeout(() => modeEdu.click(), 0);
+  }
+
+  // ループトグル時に iframe を再読み込みするためのグローバルフック
+  window._reloadEmbedForLoop = function(loopEnabled) {
+    const ct = getEstimatedCurrentTime();
+    if (isPlaybackModeActive('modeNocookie')) {
+      stopIframeTracking();
+      const _ncStart = ct > 1 ? `&start=${Math.floor(ct)}` : '';
+      const _ncLoop = loopEnabled ? `&loop=1&playlist=${videoId}` : '';
+      nocookiePlayer.src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1${_ncStart}&enablejsapi=1${_ncLoop}`;
+      nocookiePlayer.removeAttribute('hidden');
+      startIframeTracking(nocookiePlayer, ct > 1 ? ct : 0);
+    } else if (eduPlayer && isPlaybackModeActive('modeEdu')) {
+      stopIframeTracking();
+      const eduStartSec = ct > 1 ? ct : 0;
+      eduPlayer.src = getEduSrc(eduStartSec);
+      eduPlayer.removeAttribute('hidden');
+      startIframeTracking(eduPlayer, eduStartSec);
+    }
+  };
+
+}
+
+async function tryAutoplay(videoEl, audioEl) {
+  async function _doPlay() {
+    if (audioEl) {
+      return Promise.all([videoEl.play(), audioEl.play()]);
+    }
+    return videoEl.play();
+  }
+  try {
+    await _doPlay();
+    return;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      await new Promise(r => setTimeout(r, 120));
+      try {
+        await _doPlay();
+        return;
+      } catch (e2) {
+        if (e2.name !== 'NotAllowedError') return;
+      }
+    } else if (e.name !== 'NotAllowedError') {
+      return;
+    }
+  }
+  videoEl.muted = true;
+  if (audioEl) audioEl.muted = true;
+  try {
+    await _doPlay();
+    videoEl.dispatchEvent(new CustomEvent('autoplay-muted', { detail: { hasAudio: !!audioEl } }));
+  } catch (_) {}
+}
+
+function setupStreamOnlyBtns() {
+  const qualityBtns  = document.getElementById('qualityBtns');
+  const vcQualOpts   = document.getElementById('vcQualOpts');
+  const audioTrackBtns = document.getElementById('audioTrackBtns');
+  if (!qualityBtns) return;
+
+  // Remove previous track buttons
+  qualityBtns.querySelectorAll('.quality-btn-track').forEach(b => b.remove());
+  if (vcQualOpts) vcQualOpts.querySelectorAll('.vctrls-dd-opt-track').forEach(b => b.remove());
+
+  function addPanelBtn(label, mode) {
+    const btn = document.createElement('button');
+    btn.className = 'quality-btn quality-btn-track';
+    btn.textContent = label;
+    btn.dataset.trackMode = mode;
+    btn.addEventListener('click', () => switchStreamOnlyMode(mode));
+    qualityBtns.appendChild(btn);
+  }
+
+  function addOverlayOpt(label, mode) {
+    if (!vcQualOpts) return;
+    const opt = document.createElement('button');
+    opt.className = 'vctrls-dd-opt vctrls-dd-opt-track';
+    opt.textContent = label;
+    opt.dataset.trackMode = mode;
+    opt.addEventListener('click', () => {
+      switchStreamOnlyMode(mode);
+      document.querySelectorAll('.vctrls-dd-wrap.dd-open').forEach(w => w.classList.remove('dd-open'));
+    });
+    vcQualOpts.appendChild(opt);
+  }
+
+  // "通常" button — always first, active when in normal mode
+  addPanelBtn('通常', 'normal');
+  addOverlayOpt('通常', 'normal');
+  if (streamOnlyMode === 'normal') {
+    document.querySelectorAll('#qualityBtns .quality-btn-track[data-track-mode="normal"]').forEach(b => b.classList.add('active'));
+  }
+
+  if (streamBestAudioUrl) {
+    addPanelBtn('音声のみ', 'audio');
+    addOverlayOpt('音声のみ', 'audio');
+  }
+  addPanelBtn('映像のみ', 'video');
+  addOverlayOpt('映像のみ', 'video');
+
+  // Populate audio track quality buttons
+  if (audioTrackBtns) {
+    audioTrackBtns.innerHTML = '';
+    streamAudioFormats.forEach((f, i) => {
+      const kbps = f.bitrate ? `${Math.round(parseInt(f.bitrate) / 1000)}kbps` : '?';
+      const enc  = (f.encoding || f.container || '').toLowerCase();
+      const codec = enc.startsWith('opus') ? 'Opus' : enc.startsWith('mp4a') || enc === 'aac' ? 'AAC' : enc || '?';
+      const label = `${kbps} [${codec}]`;
+      const btn = document.createElement('button');
+      btn.className = 'quality-btn' + (i === 0 ? ' active' : '');
+      btn.textContent = label;
+      btn.dataset.audioUrl = f.url;
+      btn.addEventListener('click', () => switchAudioTrack(f.url, audioTrackBtns));
+      audioTrackBtns.appendChild(btn);
+    });
+  }
+
+  // Populate video track quality buttons (adaptive video-only streams only)
+  const videoTrackBtns = document.getElementById('videoTrackBtns');
+  if (videoTrackBtns) {
+    videoTrackBtns.innerHTML = '';
+
+    // Adaptive video-only streams
+    streamVideoFormats.forEach(f => {
+      const height = (() => {
+        const fromLabel = parseInt(f.qualityLabel);
+        if (fromLabel) return fromLabel;
+        const m = (f.size || '').match(/x(\d+)/);
+        return m ? parseInt(m[1]) : 0;
+      })();
+      const enc = (f.encoding || '').toLowerCase();
+      let codec = enc.startsWith('av01') || enc.startsWith('av1') ? 'AV1'
+        : enc === 'vp9' ? 'VP9'
+        : enc === 'h264' || enc === 'avc1' ? 'H.264'
+        : f.container === 'webm' ? 'VP9'
+        : enc || f.container || '?';
+      const label = height ? `${height}p [${codec}]` : (f.qualityLabel || codec || '?');
+      const btn = document.createElement('button');
+      btn.className = 'quality-btn';
+      btn.textContent = label;
+      btn.dataset.videoUrl = f.url;
+      btn.addEventListener('click', () => switchVideoTrack(f.url, videoTrackBtns));
+      videoTrackBtns.appendChild(btn);
+    });
+  }
+}
+
+function switchStreamOnlyMode(mode) {
+  const player        = document.getElementById('videoPlayer');
+  const playerWrap    = document.getElementById('playerWrap');
+  const vcQualBtn     = document.getElementById('vcQualBtn');
+  const audioTrackBar = document.getElementById('audioTrackBar');
+  const videoTrackBar = document.getElementById('videoTrackBar');
+  if (!player || !playerWrap) return;
+
+  const ct         = player.currentTime;
+  const wasPlaying = !player.paused;
+  const prevMode   = streamOnlyMode;
+  streamOnlyMode   = mode;
+
+  document.querySelectorAll('#qualityBtns .quality-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#vcQualOpts .vctrls-dd-opt').forEach(b => b.classList.remove('active'));
+
+  if (mode === 'normal') {
+    playerWrap.classList.remove('stream-audio-only');
+    if (audioTrackBar) audioTrackBar.setAttribute('hidden', '');
+    if (videoTrackBar) videoTrackBar.setAttribute('hidden', '');
+    const restoreSrc = lastNormalStreamSrc || player.src;
+    if (prevMode === 'audio' || prevMode === 'video') {
+      player.src = restoreSrc;
+      player.currentTime = ct;
+    }
+    player.muted = volState.muted;
+    if (wasPlaying) player.play().catch(() => {});
+    // Mark the matching quality button active
+    const curSrc = player.src;
+    document.querySelectorAll('#qualityBtns .quality-btn:not(.quality-btn-track)').forEach(b => {
+      b.classList.toggle('active', b.dataset.url === curSrc);
+    });
+    document.querySelectorAll('#qualityBtns .quality-btn-track[data-track-mode="normal"]').forEach(b => b.classList.add('active'));
+    document.querySelectorAll('#vcQualOpts .vctrls-dd-opt-track[data-track-mode="normal"]').forEach(b => b.classList.add('active'));
+    const _vcQb = document.getElementById('vcQualBtn');
+    if (_vcQb) {
+      const activeQBtn = document.querySelector('#qualityBtns .quality-btn:not(.quality-btn-track).active');
+      _vcQb.textContent = activeQBtn ? activeQBtn.textContent : '画質';
+    }
+    return;
+
+  } else if (mode === 'audio') {
+    if (!streamBestAudioUrl) return;
+    if (prevMode !== 'audio') lastNormalStreamSrc = player.src;
+    // Set audio poster: try maxresdefault → hqdefault → player poster fallback
+    playerWrap.style.setProperty('--audio-poster', `url(${player.poster})`);
+    if (currentVideoId) {
+      const tryUrls = [
+        `https://i.ytimg.com/vi/${currentVideoId}/maxresdefault.jpg`,
+        `https://i.ytimg.com/vi/${currentVideoId}/hqdefault.jpg`,
+      ];
+      (function tryNext(i) {
+        if (i >= tryUrls.length) return;
+        const img = new Image();
+        img.onload = () => playerWrap.style.setProperty('--audio-poster', `url(${tryUrls[i]})`);
+        img.onerror = () => tryNext(i + 1);
+        img.src = tryUrls[i];
+      })(0);
+    }
+    playerWrap.classList.add('stream-audio-only');
+    if (audioTrackBar) audioTrackBar.removeAttribute('hidden');
+    if (videoTrackBar) videoTrackBar.setAttribute('hidden', '');
+    player.muted = false;
+    player.volume = volState.vol;
+    player.src = streamBestAudioUrl;
+    player.currentTime = ct;
+    if (wasPlaying) player.play().catch(() => {});
+    document.querySelectorAll('#qualityBtns .quality-btn-track[data-track-mode="audio"]').forEach(b => b.classList.add('active'));
+    document.querySelectorAll('#vcQualOpts .vctrls-dd-opt-track[data-track-mode="audio"]').forEach(b => b.classList.add('active'));
+    if (vcQualBtn) vcQualBtn.textContent = '音声のみ';
+
+  } else if (mode === 'video') {
+    playerWrap.classList.remove('stream-audio-only');
+    if (audioTrackBar) audioTrackBar.setAttribute('hidden', '');
+    if (videoTrackBar) videoTrackBar.removeAttribute('hidden');
+    if (prevMode === 'audio' && lastNormalStreamSrc) {
+      player.src = lastNormalStreamSrc;
+    }
+    player.muted = true;
+
+    // Auto-select the highest quality adaptive video stream
+    const vtb = document.getElementById('videoTrackBtns');
+    if (streamVideoFormats.length > 0) {
+      const best = streamVideoFormats[0];
+      player.src = best.url;
+      if (vtb) {
+        vtb.querySelectorAll('.quality-btn').forEach(b => {
+          b.classList.toggle('active', b.dataset.videoUrl === best.url);
+        });
+      }
+    } else {
+      if (vtb) vtb.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
+    }
+
+    player.currentTime = ct;
+    if (wasPlaying) player.play().catch(() => {});
+    document.querySelectorAll('#qualityBtns .quality-btn-track[data-track-mode="video"]').forEach(b => b.classList.add('active'));
+    document.querySelectorAll('#vcQualOpts .vctrls-dd-opt-track[data-track-mode="video"]').forEach(b => b.classList.add('active'));
+    if (vcQualBtn) vcQualBtn.textContent = '映像のみ';
+  }
+}
+
+function switchAudioTrack(url, container) {
+  if (!url || streamOnlyMode !== 'audio') return;
+  const player = document.getElementById('videoPlayer');
+  if (!player) return;
+  streamBestAudioUrl = url;
+  const ct = player.currentTime;
+  const wasPlaying = !player.paused;
+  player.src = url;
+  player.currentTime = ct;
+  if (wasPlaying) player.play().catch(() => {});
+  if (container) {
+    container.querySelectorAll('.quality-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.audioUrl === url);
+    });
+  }
+}
+
+function switchVideoTrack(url, container) {
+  if (streamOnlyMode !== 'video') return;
+  const player = document.getElementById('videoPlayer');
+  if (!player) return;
+  const ct = player.currentTime;
+  const wasPlaying = !player.paused;
+  if (!url) return;
+  player.src = url;
+  player.muted = true;
+  player.currentTime = ct;
+  if (wasPlaying) player.play().catch(() => {});
+  if (container) {
+    container.querySelectorAll('.quality-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.videoUrl === url);
+    });
+  }
+}
+
