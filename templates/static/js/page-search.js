@@ -397,9 +397,12 @@ async function doSearch(resetPage = false) {
 
   showResultLoading();
 
+  const includeShorts = typeof getSettings === 'function' ? getSettings().searchIncludeShorts !== false : true;
+
   if (resetPage || isNewQuery) {
     currentSearchQuery = q;
-    initShortsSection(q);
+    if (includeShorts) initShortsSection(q);
+    else { const s = document.getElementById('shortsSection'); if (s) { s.innerHTML = ''; s.hidden = true; } }
   }
 
   try {
@@ -416,7 +419,7 @@ async function doSearch(resetPage = false) {
       item.type === 'channel' || item.type === 'playlist' || !isShortVideo(item)
     );
 
-    if (resetPage || isNewQuery) {
+    if (includeShorts && (resetPage || isNewQuery)) {
       const mainShorts = results.filter(item =>
         item.type !== 'channel' && item.type !== 'playlist' && isShortVideo(item)
       );
@@ -436,7 +439,7 @@ async function doSearch(resetPage = false) {
     if (regularResults.length > 0) saveCache(filters, regularResults);
     renderRegularResults(regularResults, q);
 
-    if (resetPage || isNewQuery) {
+    if (includeShorts && (resetPage || isNewQuery)) {
       const gen = shortsAutoGen;
       startShortsAutoFetch(q, filters.region, gen);
     }
@@ -466,7 +469,8 @@ function updatePagination(count) {
 
 function populateRegionSelect() {
   const sel = document.getElementById('regionSelect');
-  const region = params.get('region') || 'JP';
+  const savedRegion = (typeof getSettings === 'function') ? getSettings().searchRegion || 'JP' : 'JP';
+  const region = params.get('region') || savedRegion;
   [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name, 'ja')).forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.code;
@@ -477,12 +481,13 @@ function populateRegionSelect() {
 }
 
 function restoreFilters() {
+  const saved = (typeof getSettings === 'function') ? getSettings() : {};
   const q = params.get('q') || '';
-  const sort = params.get('sort_by') || 'relevance';
-  const date = params.get('date') || '';
-  const duration = params.get('duration') || '';
-  const type = params.get('type') || 'all';
-  const features = params.get('features') || '';
+  const sort = params.get('sort_by') || saved.searchSort || 'relevance';
+  const date = params.get('date') || saved.searchDate || '';
+  const duration = params.get('duration') || saved.searchDuration || '';
+  const type = params.get('type') || saved.searchType || 'all';
+  const features = params.get('features') || saved.searchFeatures || '';
   currentPage = parseInt(params.get('page') || '1', 10);
 
   document.getElementById('searchInput').value = q;
