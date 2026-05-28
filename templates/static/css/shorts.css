@@ -374,7 +374,7 @@ body.page-shorts .sf-param-select:focus {
 .shorts-shelf-icon {
   width: 28px;
   height: 28px;
-  background: linear-gradient(135deg, #ff0050, #ff4081);
+  background: var(--shorts-icon-gradient);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -421,6 +421,12 @@ body.page-shorts .sf-param-select:focus {
   width: 160px;
 }
 
+/* ===== SHORTS THEME TOKENS =====
+   Override these vars in pro/shorts.css to retheme without duplicating rules. */
+:root {
+  --shorts-icon-gradient: linear-gradient(135deg, #ff0050, #ff4081);
+}
+
 /* ===== CHANNEL GRID SHORTS MODE ===== */
 /* YouTube-style responsive grid for channel shorts tab */
 .channel-grid.shorts-mode {
@@ -435,7 +441,7 @@ body.page-shorts .sf-param-select:focus {
 
 /* Short badge on video cards */
 .badge-shorts {
-  background: linear-gradient(135deg, #ff0050, #ff4081);
+  background: var(--shorts-icon-gradient);
   color: #fff;
   font-size: 0.68rem;
   font-weight: 800;
@@ -578,6 +584,7 @@ body.page-shorts .sf-action-btn.active {
   color: #fff;
 }
 
+
 @media (max-width: 760px) {
   body.page-shorts .sf-comments-panel {
     position: fixed;
@@ -604,7 +611,7 @@ body.page-shorts .comment-item {
   display: flex;
   gap: 0.85rem;
   padding: 0.9rem 0;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+  border-bottom: 1px solid rgba(var(--accent2-rgb), 0.1);
 }
 body.page-shorts .comment-item:last-child { border-bottom: none; }
 body.page-shorts .comment-avatar-wrap { flex-shrink: 0; }
@@ -647,8 +654,8 @@ body.page-shorts .comment-date {
 body.page-shorts .comment-pinned {
   font-size: 0.7rem;
   color: var(--accent-bright);
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   padding: 1px 6px;
   border-radius: 999px;
 }
@@ -684,7 +691,7 @@ body.page-shorts .comment-skeleton {
   display: flex;
   gap: 0.85rem;
   padding: 0.9rem 0;
-  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+  border-bottom: 1px solid rgba(var(--accent2-rgb), 0.1);
 }
 body.page-shorts .cs-avatar {
   width: 32px;
