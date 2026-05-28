@@ -804,53 +804,6 @@ def _is_xeroxyt_short(item: dict) -> bool:
         return True
     return False
 
-
-@app.get("/api/xeroxyt-shorts-search")
-async def xeroxyt_shorts_search(q: str = Query(...)):
-    # Search with multiple query variants to maximize short video recall
-    query_variants = [q, q + " ショート", q + " #shorts"]
-
-    async def fetch_one(client: httpx.AsyncClient, base: str, search_q: str, page: int):
-        try:
-            resp = await client.get(
-                f"{base}/api/search",
-                params={"q": search_q, "page": page},
-                timeout=httpx.Timeout(15.0),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            if not isinstance(data, dict):
-                return []
-            # Collect from both 'shorts' array and 'videos' that are identified as shorts
-            candidates = list(data.get("shorts") or [])
-            for v in (data.get("videos") or []):
-                if _is_xeroxyt_short(v):
-                    candidates.append(v)
-            return candidates
-        except Exception:
-            return []
-
-    async with httpx.AsyncClient() as client:
-        tasks = [
-            fetch_one(client, base, search_q, page)
-            for base in XEROXYT_APIS
-            for search_q in query_variants
-            for page in range(1, 4)
-        ]
-        results = await asyncio.gather(*tasks)
-
-    seen: set[str] = set()
-    items = []
-    for batch in results:
-        for raw in batch:
-            normalized = _normalize_xeroxyt_item(raw)
-            if normalized and normalized["videoId"] not in seen:
-                seen.add(normalized["videoId"])
-                items.append(normalized)
-
-    return JSONResponse({"items": items})
-
-
 @app.get("/api/xeroxyt-shorts-search-stream")
 async def xeroxyt_shorts_search_stream(q: str = Query(...)):
     """SSE endpoint: streams short-video batches as each sub-request completes."""
