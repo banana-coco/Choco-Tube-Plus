@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 
 import core
 from routers import api, pages, proxy, shorts, tool
@@ -33,6 +34,10 @@ app.include_router(api.router)
 app.include_router(pages.router)
 app.include_router(tool.router)
 
+# ↓wistaのサーバー認証偽装（必ず一番最後）
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    return FileResponse("templates/tool/youtube/wista.html")
 
 class StaticCacheMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
