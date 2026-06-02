@@ -176,10 +176,26 @@
     let timer = null;
 
     async function fetchSugg(q) {
-      try {
-        const r = await fetchMain(`/api/search/suggestions?q=${encodeURIComponent(q)}`);
-        return r.suggestions || (Array.isArray(r) ? r : []);
-      } catch { return []; }
+      const [invResult, pipedResult, chocoResult] = await Promise.allSettled([
+        fetchMain(`/api/search/suggestions?q=${encodeURIComponent(q)}`),
+        fetch(`/api/piped-suggestions?q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(6000) }).then(r => r.ok ? r.json() : { suggestions: [] }),
+        fetch(`https://choco-youtube-js.onrender.com/search/suggestions?q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(6000) }).then(r => r.ok ? r.json() : { suggestions: [] }),
+      ]);
+      const invSugg = invResult.status === 'fulfilled'
+        ? (invResult.value.suggestions || (Array.isArray(invResult.value) ? invResult.value : []))
+        : [];
+      const pipedSugg = pipedResult.status === 'fulfilled'
+        ? (pipedResult.value.suggestions || [])
+        : [];
+      const chocoSugg = chocoResult.status === 'fulfilled'
+        ? (chocoResult.value.suggestions || (Array.isArray(chocoResult.value) ? chocoResult.value : []))
+        : [];
+      const seen = new Set();
+      const merged = [];
+      for (const s of [...invSugg, ...pipedSugg, ...chocoSugg]) {
+        if (typeof s === 'string' && !seen.has(s)) { seen.add(s); merged.push(s); }
+      }
+      return merged;
     }
 
     function decodeHtml(s) {
