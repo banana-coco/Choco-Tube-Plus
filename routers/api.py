@@ -1,5 +1,7 @@
 import asyncio
 import base64 as _b64
+import hashlib as _hl
+import os
 import time
 from urllib.parse import quote, urlparse as _up
 
@@ -10,6 +12,185 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from core import get_client, get_instances, proxy_parallel
 
 router = APIRouter()
+
+# ── RapidAPI YTStream ─────────────────────────────────────────────────────────
+# Keys are multi-layer encoded; decryption requires runtime /whats identity check.
+# Layer order (encrypt): XOR-dk32 → reverse → XOR-dk16hi → base64
+# Decode is the exact inverse.
+
+_PORT   = int(os.environ.get('PORT', 5000))
+_R_ENC  = [
+    "vbTXuEZyWDamPELNOVCupGJ2sHkmK23QPTiBMWMiKeC05IO6FyIfaak7SZs0F/DzY3w=",
+    "4+bU7hZ5CjGlP0bIOVCu9mB55X4mK2bVa2uCZDl1dbq8vNG4FyIfaaRtQM5uR6Dxanw=",
+    "sLXUskZ6DzehOkadOVCu8WAutCkmK2HSY2yCYmMidbqws9a+FyIfafI7Qso2G6X4ZC0=",
+]
+_H_ENC  = "ERFeI4oqifV87VLOQbxec9V/SFxxvNpiyuVyWlU33gQTElN6jD7F/HT4QcgcuAk="
+
+_keys_lock  = asyncio.Lock()
+_keys_ready = False
+_RAPIDAPI_KEYS: list[str] = []
+_YTSTREAM_HOST: str = ""
+_RAPIDAPI_KEY_IDX = 0
+
+
+def _decode(enc: str, dk: bytes) -> str:
+    buf = list(_b64.b64decode(enc))
+    buf = [b ^ dk[16 + (i % 16)] for i, b in enumerate(buf)]   # undo layer-3 XOR
+    buf = list(reversed(buf))                                    # undo layer-2 reverse
+    buf = [b ^ dk[i % 32]        for i, b in enumerate(buf)]    # undo layer-1 XOR
+    return bytes(buf).decode()
+
+
+async def _init_keys() -> None:
+    global _RAPIDAPI_KEYS, _YTSTREAM_HOST, _keys_ready
+    if _keys_ready:
+        return
+    async with _keys_lock:
+        if _keys_ready:
+            return
+        name = ""
+        try:
+            async with httpx.AsyncClient() as _c:
+                _r = await _c.get(f"http://127.0.0.1:{_PORT}/whats", timeout=3.0)
+                name = _r.json().get("name", "")
+        except Exception:
+            pass
+        if name != "choco-tube-plus":
+            return
+        _dk = _hl.sha256(name.encode()).digest()
+        _RAPIDAPI_KEYS = [_decode(e, _dk) for e in _R_ENC]
+        _YTSTREAM_HOST = _decode(_H_ENC, _dk)
+        _keys_ready = True
+
+
+async def _next_rapidapi_key() -> str | None:
+    global _RAPIDAPI_KEY_IDX
+    await _init_keys()
+    if not _RAPIDAPI_KEYS:
+        return None
+    key = _RAPIDAPI_KEYS[_RAPIDAPI_KEY_IDX % len(_RAPIDAPI_KEYS)]
+    _RAPIDAPI_KEY_IDX = (_RAPIDAPI_KEY_IDX + 1) % len(_RAPIDAPI_KEYS)
+    return key
+
+
+def _parse_mime(mime: str) -> tuple[str, str]:
+    """Return (container, encoding) from a mimeType string."""
+    container = 'mp4'
+    if 'webm' in mime:
+        container = 'webm'
+    elif 'audio/mp4' in mime or 'm4a' in mime:
+        container = 'm4a'
+
+    codec_str = ''
+    if 'codecs="' in mime:
+        codec_str = mime.split('codecs="')[1].rstrip('"').split(',')[0].strip().lower()
+    elif "codecs='" in mime:
+        codec_str = mime.split("codecs='")[1].rstrip("'").split(',')[0].strip().lower()
+
+    if codec_str.startswith('avc1') or codec_str == 'h264':
+        enc = 'H.264'
+    elif codec_str in ('vp9',) or codec_str.startswith('vp09'):
+        enc = 'VP9'
+    elif codec_str.startswith('av01') or codec_str == 'av1':
+        enc = 'AV1'
+    elif codec_str.startswith('mp4a'):
+        enc = 'aac'
+    elif codec_str == 'opus':
+        enc = 'opus'
+    else:
+        enc = codec_str or ''
+    return container, enc
+
+
+def _normalize_ytstream(raw: dict) -> dict:
+    """Convert YTStream RapidAPI response to Invidious-compatible format."""
+    format_streams = []
+    adaptive_formats = []
+
+    for f in raw.get('formats', []):
+        mime = f.get('mimeType', '')
+        container, encoding = _parse_mime(mime)
+        w, h = f.get('width', 0), f.get('height', 0)
+        format_streams.append({
+            'url': f.get('url', ''),
+            'itag': str(f.get('itag', '')),
+            'type': mime,
+            'quality': f.get('quality', ''),
+            'qualityLabel': f.get('qualityLabel', f.get('quality', '')),
+            'fps': f.get('fps', 30),
+            'size': f'{w}x{h}' if w and h else '',
+            'bitrate': str(f.get('bitrate', 0)),
+            'container': container,
+            'encoding': encoding,
+        })
+
+    for f in raw.get('adaptiveFormats', []):
+        mime = f.get('mimeType', '')
+        container, encoding = _parse_mime(mime)
+        w, h = f.get('width', 0), f.get('height', 0)
+        adaptive_formats.append({
+            'url': f.get('url', ''),
+            'itag': str(f.get('itag', '')),
+            'type': mime,
+            'quality': f.get('quality', ''),
+            'qualityLabel': f.get('qualityLabel', ''),
+            'fps': f.get('fps', 0),
+            'size': f'{w}x{h}' if w and h else '',
+            'bitrate': str(f.get('bitrate', 0)),
+            'container': container,
+            'encoding': encoding,
+        })
+
+    # Sort: combined by quality, adaptive video by height desc, audio by bitrate desc
+    q_order = {'hd2160': 0, 'hd1440': 1, 'hd1080': 2, 'hd720': 3, 'large': 4, 'medium': 5, 'small': 6, 'tiny': 7}
+    format_streams.sort(key=lambda f: q_order.get(f.get('quality', ''), 99))
+
+    return {
+        'formatStreams': format_streams,
+        'adaptiveFormats': adaptive_formats,
+        '_source': 'rapidapi',
+    }
+
+
+@router.get("/api/rapidstream/{video_id}")
+async def api_rapidstream(video_id: str):
+    """Fetch stream URLs via RapidAPI YTStream and return Invidious-compatible format."""
+    await _init_keys()
+    if not _RAPIDAPI_KEYS:
+        return JSONResponse({'error': 'no keys configured'}, status_code=502)
+    last_err = None
+    tried_keys: set[str] = set()
+    for _ in range(len(_RAPIDAPI_KEYS)):
+        key = await _next_rapidapi_key()
+        if not key or key in tried_keys:
+            break
+        tried_keys.add(key)
+        try:
+            client = await get_client()
+            resp = await client.get(
+                f'https://{_YTSTREAM_HOST}/dl',
+                params={'id': video_id},
+                headers={
+                    'X-RapidAPI-Key': key,
+                    'X-RapidAPI-Host': _YTSTREAM_HOST,
+                },
+                timeout=httpx.Timeout(18.0),
+            )
+            if resp.status_code == 429:
+                last_err = Exception('rate_limited')
+                continue
+            resp.raise_for_status()
+            raw = resp.json()
+            if raw.get('status') not in ('OK', None) and 'formats' not in raw and 'adaptiveFormats' not in raw:
+                last_err = Exception(f"unexpected response: {raw.get('status')}")
+                continue
+            data = _normalize_ytstream(raw)
+            return JSONResponse(data, headers={'X-Instance-Used': 'rapidapi'})
+        except Exception as e:
+            last_err = e
+            if '429' not in str(e) and 'rate_limited' not in str(e):
+                break
+    return JSONResponse({'error': str(last_err or 'no keys configured')}, status_code=502)
 
 # ── Thumbnail proxy ───────────────────────────────────────────────────────────
 
