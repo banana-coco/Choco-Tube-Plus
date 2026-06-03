@@ -54,6 +54,11 @@ async def tool_youtube_light():
     return FileResponse("templates/tool/youtube/light.html", media_type="text/html")
 
 
+@router.get("/tool/youtube/nakayosi")
+async def tool_youtube_nakayosi():
+    return FileResponse("templates/tool/youtube/nakayosi.html", media_type="text/html")
+
+
 @router.get("/tool/youtube/wista")
 @router.get("/tool/youtube/wista/")
 @router.get("/tool/youtube/wista/{path:path}")
