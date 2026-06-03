@@ -9,8 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-INVIDIOUS_BASE = "https://raw.githubusercontent.com/kuru-bana/yt-data/main/invidious"
-VIDEO_BACK_URL = "https://raw.githubusercontent.com/kuru-bana/yt-data/refs/heads/main/api/video-back.json"
+INVIDIOUS_LIST_URL = "https://raw.githubusercontent.com/kuru-bana/yt-data/refs/heads/main/list/injidious.json"
 INNERTUBE_BASE = "https://choco-youtube-js.onrender.com"
 CACHE_TTL = 5 * 60
 
@@ -96,39 +95,18 @@ templates.env.globals["static_ver"] = _STATIC_VER
 category_cache: dict = {}
 
 
-async def get_instances(category: str) -> list:
+_INVIDIOUS_LIST_KEY = "__invidious_list__"
+
+
+async def _fetch_invidious_list() -> list:
+    """injidious.json（シンプルなURLリスト）をキャッシュ付きで取得する。"""
     now = time.time()
-    cached = category_cache.get(category)
+    cached = category_cache.get(_INVIDIOUS_LIST_KEY)
     if cached and now - cached["time"] < CACHE_TTL:
         return cached["instances"]
     try:
         client = await get_client()
-        resp = await client.get(f"{INVIDIOUS_BASE}/{category}.json", timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        instances = data.get("working_instances", [])
-    except Exception:
-        if cached:
-            return cached["instances"]
-        raise
-    if not instances:
-        if cached:
-            return cached["instances"]
-        return []
-    category_cache[category] = {"instances": instances, "time": now}
-    return instances
-
-
-async def get_video_back_instances() -> list:
-    """video-back.json（シンプルなURLリスト）のインスタンスをキャッシュ付きで取得する。"""
-    _KEY = "__video_back__"
-    now = time.time()
-    cached = category_cache.get(_KEY)
-    if cached and now - cached["time"] < CACHE_TTL:
-        return cached["instances"]
-    try:
-        client = await get_client()
-        resp = await client.get(VIDEO_BACK_URL, timeout=10)
+        resp = await client.get(INVIDIOUS_LIST_URL, timeout=10)
         resp.raise_for_status()
         instances = resp.json()
         if not isinstance(instances, list):
@@ -141,8 +119,16 @@ async def get_video_back_instances() -> list:
         if cached:
             return cached["instances"]
         return []
-    category_cache[_KEY] = {"instances": instances, "time": now}
+    category_cache[_INVIDIOUS_LIST_KEY] = {"instances": instances, "time": now}
     return instances
+
+
+async def get_instances(category: str) -> list:
+    return await _fetch_invidious_list()
+
+
+async def get_video_back_instances() -> list:
+    return await _fetch_invidious_list()
 
 
 # ── Proxy helpers ─────────────────────────────────────────────────────────────
