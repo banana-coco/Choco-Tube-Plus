@@ -5,13 +5,64 @@ function instanceHostname(invInstance) {
   try { return new URL(invInstance).hostname; } catch { return invInstance; }
 }
 
+async function fetchZernioStreamData(videoId) {
+  const res = await fetch(`/api/zerniostream/${encodeURIComponent(videoId)}?formatId=2`, {
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!res.ok) throw new Error(`Zernio HTTP ${res.status}`);
+  const url = (await res.text()).trim();
+  if (!url || !url.startsWith('http')) throw new Error('無効なZernio URL');
+  return {
+    data: {
+      formatStreams: [{ url, quality: '360p', qualityLabel: '360p', container: 'mp4' }],
+      adaptiveFormats: []
+    },
+    instanceUrl: 'zernio'
+  };
+}
+
 async function fetchBestStream(videoId, excludeParam) {
   const invPath = `/api/stream/${videoId}${excludeParam || ''}`;
   const src = (typeof streamSourcePref !== 'undefined') ? streamSourcePref : 'auto';
   if (src === 'invidious') return fetchStream(invPath);
   if (src === 'rapidapi')  return fetchRapidStream(videoId);
-  // auto: fire both in parallel, return first valid
-  return Promise.any([fetchStream(invPath), fetchRapidStream(videoId)]).catch(() => fetchStream(invPath));
+  if (src === 'zernio')    return fetchZernioStreamData(videoId);
+
+  // auto: Invidious・RapidAPI・Zernio の3つを並列で競争させ最速を使う
+  const invPromise    = fetchStream(invPath);
+  const rapidPromise  = fetchRapidStream(videoId);
+  const zernioPromise = fetchZernioStreamData(videoId);
+
+  const winner = await Promise.any([zernioPromise, invPromise, rapidPromise])
+    .catch(() => fetchStream(invPath));
+
+  // Zernio が勝った場合：HQ・音声のみ用に Inv/Rapid の結果をバックグラウンドで待つ
+  // （HQ再生はZernioを一切使わない / 音声のみもZernioは使わない）
+  if (winner.instanceUrl === 'zernio') {
+    const capturedGen = _reloadGen;
+    Promise.any([invPromise, rapidPromise]).then(bgResult => {
+      if (capturedGen !== _reloadGen) return; // 世代が変わっていたら破棄
+      // HQモードをInv/Rapidデータで更新
+      if (typeof initHQMode === 'function') initHQMode(bgResult.data);
+      // 音声・映像アダプティブフォーマットを更新
+      const adaptiveFormats = bgResult.data.adaptiveFormats || [];
+      const audioFormats = adaptiveFormats
+        .filter(f => f.type?.startsWith('audio/'))
+        .sort((a, b) => (parseInt(b.bitrate) || 0) - (parseInt(a.bitrate) || 0));
+      const videoFormats = adaptiveFormats.filter(f => f.type?.startsWith('video/'));
+      if (audioFormats.length > 0) {
+        streamBestAudioUrl = audioFormats[0].url;
+        streamAudioFormats = audioFormats;
+      }
+      if (videoFormats.length > 0) {
+        streamVideoFormats = videoFormats;
+      }
+      // 音声のみ・映像のみボタンを再描画（音声のみボタンが出現する）
+      if (typeof setupStreamOnlyBtns === 'function') setupStreamOnlyBtns();
+    }).catch(() => {});
+  }
+
+  return winner;
 }
 
 function setInstanceLabel(invInstance) {
