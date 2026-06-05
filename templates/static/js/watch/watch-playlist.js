@@ -161,9 +161,11 @@ async function initPlaylistPanel(playlistId, globalIndex) {
 let streamExcludeList = [];
 let reloadAllInProgress = false;
 let streamAltBarReady = false;
+let _reloadGen = 0;
 
 async function reloadAll(videoId) {
-  if (reloadAllInProgress) return;
+  // 世代カウンタを進めて旧フェッチを無効化（早期リターンしない）
+  const myGen = ++_reloadGen;
   reloadAllInProgress = true;
 
   const reloadAllBtn = document.getElementById('reloadAllBtn');
@@ -249,6 +251,9 @@ async function reloadAll(videoId) {
       withRetry(() => fetchMain(`/api/videos/${videoId}`))
     ]);
 
+    // 切り替えで新しいリロードが始まっていたら破棄
+    if (myGen !== _reloadGen) return;
+
     const { data: streamData, instanceUrl } = streamResult;
     const invInstance = instanceUrl || streamData._invidious_instance || null;
     streamExcludeList = invInstance ? [invInstance] : [];
@@ -264,9 +269,11 @@ async function reloadAll(videoId) {
     renderVideoInfo(metaData, videoId);
     renderRelated(metaData.recommendedVideos || []);
   } catch (e) {
+    if (myGen !== _reloadGen) return;
     console.error(e);
   }
 
+  if (myGen !== _reloadGen) return;
   initTranscript(videoId);
 
   reloadAllInProgress = false;
