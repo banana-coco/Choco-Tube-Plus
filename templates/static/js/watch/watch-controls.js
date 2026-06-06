@@ -45,6 +45,8 @@ async function fetchBestStream(videoId, excludeParam) {
       if (capturedGen !== _reloadGen) return; // 世代が変わっていたら破棄
       // HQモードをInv/Rapidデータで更新
       if (typeof initHQMode === 'function') initHQMode(bgResult.data);
+      // HQインスタンスラベルをZernioから実際のソース（inv/rapid）に更新
+      setHQInstanceLabel(bgResult.instanceUrl);
       // 音声・映像アダプティブフォーマットを更新
       const adaptiveFormats = bgResult.data.adaptiveFormats || [];
       const audioFormats = adaptiveFormats
