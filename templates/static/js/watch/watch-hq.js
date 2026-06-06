@@ -1,3 +1,19 @@
+function setPendingHQMode() {
+  const btn = document.getElementById('modeHQ');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.dataset.hqPending = 'true';
+  btn.title = 'HQストリーム取得中...';
+}
+
+function setHQModeError(msg) {
+  const btn = document.getElementById('modeHQ');
+  if (!btn) return;
+  btn.dataset.hqPending = 'false';
+  btn.disabled = true;
+  btn.title = msg || '高画質ストリームが取得できませんでした';
+}
+
 function teardownHQ() {
   const audio = document.getElementById('hqAudio');
   const player = document.getElementById('videoPlayer');
@@ -125,14 +141,17 @@ function initHQMode(streamData) {
 
   const modeHQBtn = document.getElementById('modeHQ');
   if (videoFormats.length === 0 || audioFormats.length === 0) {
-    if (modeHQBtn) modeHQBtn.disabled = true;
-    if (modeHQBtn) modeHQBtn.title = '高画質ストリームが取得できませんでした';
+    if (modeHQBtn && modeHQBtn.dataset.hqPending !== 'true') {
+      modeHQBtn.disabled = true;
+      modeHQBtn.title = '高画質ストリームが取得できませんでした';
+    }
     return;
   }
 
   if (modeHQBtn) {
     modeHQBtn.disabled = false;
     modeHQBtn.title = '';
+    modeHQBtn.dataset.hqPending = 'false';
   }
 
   const videoSelect = document.getElementById('hqVideoSelect');
