@@ -514,6 +514,113 @@ header {
   .home-hero-logo { font-size: 2rem; }
 }
 
+/* ===== HOME SHORTCUTS ===== */
+.home-shortcuts {
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem 2.5rem;
+}
+
+.shortcut-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 1200px;
+}
+
+.shortcut-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 266px;
+  border-radius: 20px;
+  text-decoration: none;
+  position: relative;
+  overflow: hidden;
+  gap: 0.85rem;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  backdrop-filter: blur(14px);
+  transition: transform 0.28s cubic-bezier(.22, 1, .36, 1),
+              box-shadow 0.28s,
+              border-color 0.28s;
+}
+
+.shortcut-card:hover {
+  transform: translateY(-7px) scale(1.025);
+  border-color: var(--border-glow);
+  box-shadow: 0 16px 48px var(--glow-purple), 0 4px 18px var(--glow-cyan);
+}
+
+.sc-deco {
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.shortcut-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--accent-rgb), 0.14);
+  border: 1px solid rgba(var(--accent-rgb), 0.28);
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.shortcut-card:hover .shortcut-icon-wrap {
+  background: rgba(var(--accent-rgb), 0.24);
+  border-color: rgba(var(--accent2-rgb), 0.5);
+}
+
+.shortcut-icon-wrap svg {
+  width: 34px;
+  height: 34px;
+  color: var(--accent-bright);
+}
+
+.shortcut-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.shortcut-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: center;
+  padding: 0 0.8rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .shortcut-card { width: 150px; height: 224px; }
+  .shortcut-icon-wrap { width: 58px; height: 58px; border-radius: 15px; }
+  .shortcut-icon-wrap svg { width: 28px; height: 28px; }
+  .shortcut-label { font-size: 0.9rem; }
+  .shortcut-sub { font-size: 0.72rem; }
+}
+
+@media (max-width: 480px) {
+  .shortcut-grid { gap: 0.65rem; }
+  .shortcut-card { width: 130px; height: 196px; }
+  .shortcut-icon-wrap { width: 50px; height: 50px; border-radius: 13px; }
+  .shortcut-icon-wrap svg { width: 24px; height: 24px; }
+}
+
 /* ===== MAIN ===== */
 main {
   max-width: 1400px;
