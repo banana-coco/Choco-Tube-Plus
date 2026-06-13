@@ -360,39 +360,80 @@ async def _fetch_piped_info(video_id: str) -> dict | None:
     return None
 
 
+_VIDEOINFO_CACHE: dict = {}
+_VIDEOINFO_TTL = 180
+_VIDEOINFO_MAX = 300
+_videoinfo_inflight: dict = {}
+
+
 @router.get("/api/videoinfo/{video_id}")
 async def api_video_info(video_id: str):
-    async def _inv() -> dict | None:
+    now = time.time()
+    cached = _VIDEOINFO_CACHE.get(video_id)
+    if cached and now - cached["time"] < _VIDEOINFO_TTL:
+        return JSONResponse(cached["data"])
+
+    if video_id in _videoinfo_inflight:
+        fut = _videoinfo_inflight[video_id]
         try:
-            result = await proxy_parallel("video", f"/api/v1/videos/{video_id}")
-            return result["data"]
+            data = await asyncio.shield(fut)
+            return JSONResponse(data)
         except Exception:
-            return None
+            pass
 
-    inv_task = asyncio.create_task(_inv())
-    piped_task = asyncio.create_task(_fetch_piped_info(video_id))
+    loop = asyncio.get_event_loop()
+    fut: asyncio.Future = loop.create_future()
+    _videoinfo_inflight[video_id] = fut
 
-    pending: set = {inv_task, piped_task}
-    result = None
-
-    while pending and result is None:
-        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-        for task in done:
+    try:
+        async def _inv() -> dict | None:
             try:
-                r = task.result()
-                if r is not None:
-                    result = r
-                    break
+                result = await proxy_parallel("video", f"/api/v1/videos/{video_id}")
+                return result["data"]
             except Exception:
-                pass
+                return None
 
-    for task in pending:
-        task.cancel()
+        inv_task = asyncio.create_task(_inv())
+        piped_task = asyncio.create_task(_fetch_piped_info(video_id))
 
-    if result is not None:
-        return JSONResponse(result)
+        pending: set = {inv_task, piped_task}
+        result = None
 
-    return JSONResponse({"error": "動画情報の取得に失敗しました"}, status_code=502)
+        while pending and result is None:
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            for task in done:
+                try:
+                    r = task.result()
+                    if r is not None:
+                        result = r
+                        break
+                except Exception:
+                    pass
+
+        for task in pending:
+            task.cancel()
+
+        if result is not None:
+            is_error = isinstance(result, dict) and result.get("error")
+            if not is_error:
+                if len(_VIDEOINFO_CACHE) >= _VIDEOINFO_MAX:
+                    oldest = min(_VIDEOINFO_CACHE, key=lambda k: _VIDEOINFO_CACHE[k]["time"])
+                    _VIDEOINFO_CACHE.pop(oldest, None)
+                _VIDEOINFO_CACHE[video_id] = {"data": result, "time": time.time()}
+            if not fut.done():
+                fut.set_result(result)
+            return JSONResponse(result)
+
+        if not fut.done():
+            fut.set_exception(Exception("fetch failed"))
+        return JSONResponse({"error": "動画情報の取得に失敗しました"}, status_code=502)
+
+    except Exception as exc:
+        if not fut.done():
+            fut.set_exception(exc)
+        raise
+    finally:
+        _videoinfo_inflight.pop(video_id, None)
 
 
 # ── Piped stream ───────────────────────────────────────────────────────────────
