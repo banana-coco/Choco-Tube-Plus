@@ -253,7 +253,7 @@ async function reloadAll(videoId) {
     for (let i = 0; i < maxRetries; i++) {
       if (!_genOk()) return null;
       try {
-        const r = await fetch(`/api/videoinfo/${encodeURIComponent(videoId)}`, { signal: AbortSignal.timeout(20000) });
+        const r = await fetch(`/api/videoinfo/${encodeURIComponent(videoId)}?nocache=1`, { signal: AbortSignal.timeout(20000) });
         if (r.ok) return r.json();
       } catch {}
       if (i < maxRetries - 1)
